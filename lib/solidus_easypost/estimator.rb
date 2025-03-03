@@ -3,10 +3,22 @@
 module SolidusEasypost
   class Estimator
     def shipping_rates(package, _frontend_only = true)
-      easypost_rates = ShipmentBuilder.from_package(package).rates.sort_by(&:rate)
+      # NOTE: The easypost_shipments were being created again when retrieving shipping_rates
+      # Hence this method has been updated to check if an EasyPost shipment has already been created for the shipment.
+      # If it exists, it fetches the stored shipping rates instead of creating a new EasyPost shipment.
+      shipment = package.shipment
 
-      shipping_rates = easypost_rates.map { |rate| build_shipping_rate(rate) }.compact
-      shipping_rates.min_by(&:cost)&.selected = true
+      if shipment.easypost_shipment
+        shipping_rates = shipment.shipping_rates
+      else
+        easypost_rates = ShipmentBuilder.from_package(package).rates.sort_by(&:rate)
+
+        # Build shipping rate objects from EasyPost rates.
+        shipping_rates = easypost_rates.map { |rate| build_shipping_rate(rate) }.compact
+
+        # Automatically select the shipping rate with the lowest cost.
+        shipping_rates.min_by(&:cost)&.selected = true
+      end
 
       shipping_rates
     end

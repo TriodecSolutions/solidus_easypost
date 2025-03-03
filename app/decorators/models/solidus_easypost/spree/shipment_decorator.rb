@@ -29,7 +29,40 @@ module SolidusEasypost
         easypost_shipment&.postage_label&.label_url
       end
 
+      def select_shipping_method(shipping_method)
+        # Selects the specified shipping method for the shipment.
+        # This method fetches available shipping rates using the estimator and
+        # marks the selected shipping rate while deselecting all others.
+        estimator = ::Spree::Config.stock.estimator_class.new
+        rates = estimator.shipping_rates(to_package, false)
+
+        # Find the rate that matches the provided shipping method
+        rate = rates.detect { |detected| detected.shipping_method_id == shipping_method.id }
+
+        # Mark the selected shipping method as true and deselect others
+        deselect_other_shipping_rates(rate.id)
+        rate.update(selected: true)
+      end
+
+      def update_amounts
+        # NOTE: Reload the shipment to reflect any updates to the selected shipping rate.
+        # Updates the shipment amounts by reloading the selected shipping rate.
+        # This ensures that the shipment cost is recalculated based on the latest
+        # selected shipping rate.
+        reload
+
+        # Call the parent method from solidus_core to ensure proper cost recalculations.
+        super
+      end
+
       private
+
+      def deselect_other_shipping_rates(selected_rate_id)
+        # Deselects all shipping rates except the one selected by the user.
+        # This ensures that only one shipping rate remains marked as selected.
+        # Update all other shipping rates, setting `selected` to false.
+        shipping_rates.where.not(id: selected_rate_id).update_all(selected: false)
+      end
 
       def buy_easypost_rate
         # Skip label purchase if tracking information already exists.

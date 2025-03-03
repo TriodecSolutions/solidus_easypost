@@ -36,6 +36,20 @@ RSpec.describe Spree::Shipment do
           expect(shipment.shipping_rates.where(selected: true).count).to eq(1)
         end
       end
+
+      it 'updates the selected rate when updated by user' do
+        VCR.use_cassette('shipment/update_selected_shipping_rates') do
+          easypost_config_setup(purchase_labels: true)
+          expect(shipment.selected_shipping_rate.cost).to eq(shipment.shipping_rates.minimum(:cost))
+          # Fetch and select shipping method with maximum shipping rate cost.
+          shipping_rate = shipment.shipping_rates.order(cost: :asc).last
+          shipping_method = shipping_rate.shipping_method
+          shipment.select_shipping_method(shipping_method)
+          order.recalculate
+          shipment.reload
+          expect(shipment.cost).to eq(shipping_rate.cost)
+        end
+      end
     end
 
     context 'when purchase_labels is false' do
